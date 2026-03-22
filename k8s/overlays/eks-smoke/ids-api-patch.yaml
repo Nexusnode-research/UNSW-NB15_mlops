@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ids-api
+  namespace: ids
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: api
+          image: 002232587129.dkr.ecr.af-south-1.amazonaws.com/unsw-nb15-mlops-api:smoke
+          imagePullPolicy: Always
+          env:
+            - name: IDS_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ids-api-secrets
+                  key: IDS_API_TOKEN
+            - name: IDS_BUNDLE_DIR
+              value: /app/notebooks/ids_unsw/models/bundle_xgb
+            - name: IDS_SCALER_PATH
+              value: /app/notebooks/ids_unsw/models/scaler.pkl
+            - name: IDS_EXPOSE_DOCS
+              value: "true"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"

@@ -1,0 +1,48 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: unsw-mlops-smoke
+  region: af-south-1
+  version: "1.31"
+  tags:
+    project: UNSW-NB15_MLOPS
+    purpose: smoke-test
+    teardown: same-day
+
+# OIDC provider — required for any future IRSA; costs nothing
+iam:
+  withOIDC: true
+
+# Public API endpoint only — no private endpoint needed for a same-day smoke
+kubernetesNetworkConfig:
+  serviceIPv4CIDR: 172.20.0.0/16
+
+vpc:
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: false
+  # Disable NAT gateways — nodes live in public subnets, pull directly over IGW
+  nat:
+    gateway: Disable
+
+managedNodeGroups:
+  - name: smoke-ng
+    instanceType: t3.medium    # 2 vCPU / 4 GB — minimum viable for EKS system + 2 app pods
+    desiredCapacity: 2
+    minSize: 1
+    maxSize: 2
+    # Nodes in public subnets — avoids NAT gateway cost entirely
+    privateNetworking: false
+    # Assign public IPs so nodes can reach ECR and EKS API over IGW
+    disableIMDSv1: true
+    amiFamily: AmazonLinux2
+    labels:
+      role: smoke
+    iam:
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+    tags:
+      purpose: smoke-test

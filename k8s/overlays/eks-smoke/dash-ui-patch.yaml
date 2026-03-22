@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dash-ui
+  namespace: ids
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: ui
+          image: 002232587129.dkr.ecr.af-south-1.amazonaws.com/unsw-nb15-mlops-ui:smoke
+          imagePullPolicy: Always
+          env:
+            - name: IDS_API_URL
+              value: http://ids-api:8000
+            - name: IDS_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ids-api-secrets
+                  key: IDS_API_TOKEN
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "384Mi"

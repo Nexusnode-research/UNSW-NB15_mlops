@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ids
+
+# Smoke-test overlay — cheapest valid EKS proof only.
+# - All services: ClusterIP (access via kubectl port-forward)
+# - No HPA, no LoadBalancer, no ingress
+# - Single replica, minimal resource requests
+# - Tear down cluster the same day
+
+resources:
+  - ../../base
+
+patches:
+  # Patch ids-api: ECR image + small resources
+  - path: ids-api-patch.yaml
+
+  # Patch dash-ui: ECR image + small resources
+  # (base is already ClusterIP — no service type change needed)
+  - path: dash-ui-patch.yaml
