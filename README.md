@@ -1,5 +1,10 @@
 # UNSW-NB15_MLOPS
 
+[![CI](https://github.com/vincembanze/UNSW-NB15_mlops/actions/workflows/ci.yml/badge.svg)](https://github.com/vincembanze/UNSW-NB15_mlops/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+**Version 1.0** — [See release notes in CHANGELOG.md](./CHANGELOG.md)
+
 End-to-end, production-style MLOps pipeline for **network intrusion detection** on the **UNSW-NB15** dataset.
 It covers the full stack: **data engineering → model training (XGBoost) → threshold selection → ONNX export → FastAPI service → Dash UI → CI smoke tests → Kubernetes (HPA, probes, kustomize).**
 
@@ -105,7 +110,7 @@ UNSW-NB15_mlops/
 │        └─ bundle_xgb/        # xgb.onnx, feature_names.json, metadata.json
 ├─ tests/                      # pytest bundle tests
 ├─ k8s/                        # kustomize manifests (api, ui, hpa, patches)
-├─ docs/                       # architecture decisions and cleanup plan
+├─ docs/                       # architecture decisions; archive/ for completed checklists & reports
 ├─ docker-compose.dev.yml      # GPU dev/notebook environment (JupyterLab)
 ├─ docker-compose.serve.yml    # local API + Dash UI serving stack
 ├─ docker-compose.mlflow.yml   # optional local MLflow tracking server
@@ -228,7 +233,7 @@ python ids_unsw/features/engineer.py \
 
 ```bash
 export MLFLOW_TRACKING_URI=http://localhost:5000   # optional
-python train.py \
+python ids_unsw/experiments/train.py \
   --train-input notebooks/ids_unsw/data/UNSW_NB15_train_clean.parquet \
   --test-input  notebooks/ids_unsw/data/UNSW_NB15_test_clean.parquet \
   --models-dir  notebooks/ids_unsw/models \
@@ -333,7 +338,7 @@ This repo ships **kustomize** resources and patches for a token-protected API:
 **Apply:**
 
 ```bash
-kubectl apply -k k8s/
+kubectl apply -k k8s/overlays/dev
 kubectl get pods,svc,hpa
 kubectl top pods -A   # if metrics-server is patched and working
 ```

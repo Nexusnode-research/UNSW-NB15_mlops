@@ -58,7 +58,7 @@
 \hypersetup{
 pdftitle={A Production-Grade Intrusion Detection System with Cloud-Native MLOps},
 pdfsubject={Intrusion Detection, MLOps},
-pdfauthor={First author, Second author},
+pdfauthor={Vince Mbanze, Thabo Pilusa},
 pdfkeywords={Intrusion Detection System, MLOps, XGBoost, ONNX, Kubernetes, FastAPI, CI/CD},
 }
 
@@ -67,7 +67,7 @@ pdfkeywords={Intrusion Detection System, MLOps, XGBoost, ONNX, Kubernetes, FastA
 \maketitle
 
 \begin{abstract}
-We present an end-to-end intrusion detection system (IDS) on the UNSW-NB15 dataset, engineered for production. The pipeline produces 34 numeric features via reproducible cleaning, encoding, and scaling; models are tuned on a train/validation split and evaluated on a held-out test set. Among logistic regression, a multilayer perceptron, random forest, and gradient-boosted trees, XGBoost delivered the best recall–precision trade-off. On the test set, the final model achieved a Receiver Operating Characteristic Area Under the Curve (ROC-AUC) of 0.9805. At a high-recall operating point ($\tau=0.6286$) chosen to minimize the False Positive Rate (FPR) subject to recall $\ge 0.95$, the model reached an F1-score of 0.9101, precision of 0.8708, and recall of 0.9531. The trained model is exported to the Open Neural Network Exchange (ONNX) format and served with onnxruntime behind a token-authenticated Application Programming Interface (API) microservice, with a Dash User Interface (UI) for ad-hoc scoring and threshold management. For production, we containerize the API and UI and deploy on Amazon Elastic Kubernetes Service (EKS) via Kustomize overlays; a GitHub Actions pipeline builds to Amazon Elastic Container Registry (ECR), runs smoke tests, and rolls out with readiness/liveness probes and a Horizontal Pod Autoscaler (HPA). Secrets are managed via Kubernetes Secrets.
+We present an end-to-end intrusion detection system (IDS) on the UNSW-NB15 dataset, engineered for production. The pipeline produces 34 numeric features via reproducible cleaning, encoding, and scaling; models are tuned on a train/validation split and evaluated on a held-out test set. Among logistic regression, a multilayer perceptron, random forest, and gradient-boosted trees, XGBoost delivered the best recall–precision trade-off. On the test set, the final model achieved a Receiver Operating Characteristic Area Under the Curve (ROC-AUC) of 0.9805. At a high-recall operating point ($\tau=0.6286$) chosen to minimize the False Positive Rate (FPR) subject to recall $\ge 0.95$, the model reached an F1-score of 0.9101, precision of 0.8708, and recall of 0.9531. The trained model is exported to the Open Neural Network Exchange (ONNX) format and served with onnxruntime behind a token-authenticated Application Programming Interface (API) microservice, with a Dash User Interface (UI) for ad-hoc scoring and threshold management. For production, we containerize the API and UI and deploy on Amazon Elastic Kubernetes Service (EKS) via Kustomize overlays; GitHub Actions workflows manage integration via Docker Hub and deployment to Amazon Elastic Container Registry (ECR), run smoke tests, and execute rollouts with readiness/liveness probes and a Horizontal Pod Autoscaler (HPA). Secrets are managed via Kubernetes Secrets.
 \end{abstract}
 
 % add keywords
@@ -114,7 +114,7 @@ This study situates itself at that intersection. Rather than proposing a new cla
 \toprule
 \textbf{Study} & \textbf{Dataset Protocol} & \textbf{Models} & \textbf{Metrics} & \textbf{Deployment / Serving} & \textbf{Source}\\
 \midrule
-This work (2025) & UNSW-NB15 fixed splits; stratified validation; reproducible preprocessing & LR, MLP, RF, XGBoost & ROC-AUC, Precision, Recall, F1, FPR, Confusion matrix & ONNX export, FastAPI service, CI/CD smoke tests, threshold governance & -\\
+This work (2026) & UNSW-NB15 fixed splits; stratified validation; reproducible preprocessing & LR, MLP, RF, XGBoost & ROC-AUC, Precision, Recall, F1, FPR, Confusion matrix & ONNX export, FastAPI service, CI/CD smoke tests, threshold governance & -\\
 \addlinespace
 Kocher \& Kumar (2020)  & UNSW-NB15, standard ML split & NB, LR, KNN, SVM, DT, RF & Accuracy, MSE, Precision, Recall, F1, TPR/FPR & None (offline) & \cite{kocher2020}\\
 \addlinespace
@@ -147,7 +147,7 @@ We base the study on the UNSW-NB15 intrusion-detection corpus (flow records with
 \textbf{Split discipline.} Within the published training partition we create a stratified validation split on the binary target (fixed seed) for model selection. To prevent count inflation while preserving partition semantics, we remove exact duplicate rows within the training split only; the test split is left untouched. No cross-partition deduplication or temporal reshuffling is performed. Similar disciplined preprocessing has been recommended to improve reliability of UNSW-NB15 evaluations \cite{kocher2020}.
 
 \subsection{Feature engineering}
-Feature processing follows the repository’s \texttt{engineer.py}:
+Feature processing follows the repository’s \texttt{ids\_unsw/features/engineer.py}:
 \begin{itemize}
     \item \textbf{Categoricals (processed vs used).} Fields processed as categorical are \texttt{proto}, \texttt{service}, \texttt{state}, and \texttt{attack\_cat}; only \texttt{proto}, \texttt{service}, and \texttt{state} enter the 34-feature predictor set. The \texttt{service} sentinel ``-'' is normalised to ``unknown''.
     \item \textbf{Deterministic encoding.} We use \texttt{OrdinalEncoder(handle\_unknown="use\_encoded\_value", unknown\_value=-1)} fitted on the training split and applied unchanged to validation/test, ensuring unseen symbols map deterministically to -1. %We do not one-hot encode.
@@ -180,26 +180,26 @@ The champion XGBoost model is exported to ONNX with \texttt{onnxmltools}/\texttt
     \item \texttt{metadata.json} — persisted threshold and metrics,
     \item \texttt{scaler.pkl} — train-fitted standardiser.
 \end{itemize}
-\textbf{Parity checks.} \texttt{tests/test\_bundle.py} asserts schema presence, threshold persistence, and ONNX loadability. \texttt{onnx\_smoke.py} verifies probabilities/labels against the saved scaler and feature order.
+\textbf{Parity checks.} \texttt{tests/test\_bundle.py} asserts schema presence, threshold persistence, and ONNX loadability. \texttt{ids\_unsw/experiments/onnx\_smoke.py} verifies probabilities/labels against the saved scaler and feature order. Additionally, \texttt{validate\_bundle} ensures runtime integrity natively during the API's \texttt{lifespan} startup event and atomic hot-reloads.
 
 Export and parity validation follow emerging best practices for portable IDS deployment \cite{pinto2024}.
 
 \subsection{Deployment pipeline and environment}
-\textbf{Serving stack.} The model is exposed via a token-authenticated FastAPI microservice backed by a warmed ONNX Runtime (CPU) session, paired with an operator-facing Dash UI. The API implements: \texttt{GET /health}, \texttt{GET /features}, \texttt{GET /meta/metadata}, \texttt{POST /predict\_proba}, \texttt{POST /predict}, \texttt{POST /set\_threshold}, \texttt{POST /reload}, and \texttt{POST /deploy\_registry}. Requests to \texttt{/predict(\_proba)} must supply exactly the 34 feature keys; the server validates keys (rejecting missing/extra fields with a structured 422), orders columns per \texttt{feature\_names.json}, casts inputs to \texttt{float32}, applies the saved scaler, and scores ONNX. No server-side category re-encoding occurs. Authentication uses a Bearer token (\texttt{IDS\_API\_TOKEN}) required at startup. The service discovers artefacts via \texttt{IDS\_BUNDLE\_DIR} (bundle path) and \texttt{IDS\_SCALER\_PATH} (scaler path).
+\textbf{Serving stack.} The model is exposed via a token-authenticated FastAPI microservice backed by a warmed ONNX Runtime (CPU) session, paired with an operator-facing Dash UI. The API implements: \texttt{GET /health}, \texttt{GET /features}, \texttt{GET /metadata}, \texttt{POST /predict\_proba}, \texttt{POST /predict}, \texttt{POST /set\_threshold}, \texttt{POST /reload}, and \texttt{POST /deploy\_registry}. Requests to \texttt{/predict(\_proba)} must supply exactly the 34 feature keys; the server validates keys (rejecting missing/extra fields with a structured 422), orders columns per \texttt{feature\_names.json}, casts inputs to \texttt{float32}, applies the saved scaler, and scores ONNX. No server-side category re-encoding occurs. Authentication uses a Bearer token (\texttt{IDS\_API\_TOKEN}) required at startup. The service discovers artefacts via \texttt{IDS\_BUNDLE\_DIR} (bundle path) and \texttt{IDS\_SCALER\_PATH} (scaler path).
 
 \textbf{Provenance and registry (MLflow).} Training and threshold-selection runs log parameters, metrics, and artefacts to MLflow at a configured tracking URI. The ONNX artefact can be registered in the MLflow Model Registry. The API’s \texttt{POST /deploy\_registry} endpoint pulls a specific registry version (or its run source) into the bundle directory and hot-reloads it. This provides an auditable chain from experiment $\to$ registered model $\to$ deployed bundle, in line with cloud-native MLOps best practices \cite{naayini2025}.
 
-\textbf{Containerisation and orchestration.} Slim Docker images are built for the API and UI. Kustomize overlays manage environment-specific Kubernetes manifests (replica counts, resource requests/limits). Since all API endpoints are Bearer-authenticated, probes are configured to supply the authorization header; alternatively, \texttt{/health} can be exempted. This ensures liveness/readiness checks reflect true production posture. A CPU-based Horizontal Pod Autoscaler (HPA) is configured for the API to scale replicas under load. These patterns align with recommended CI/CD automation for Kubernetes workloads \cite{shrestha2024}.
+\textbf{Containerisation and orchestration.} Slim Docker images are built for the API and UI. Kustomize overlays manage environment-specific Kubernetes manifests (replica counts, resource requests/limits). The \texttt{/health} endpoint is intentionally public (auth-exempt) to enable straightforward Kubernetes liveness and readiness probes without baking secrets into manifests. Scoring and administrative endpoints require rigorous Bearer authentication. A CPU-based Horizontal Pod Autoscaler (HPA) is configured for the API to scale replicas under load. These patterns align with recommended CI/CD automation for Kubernetes workloads \cite{shrestha2024}.
 
 \textbf{Deployment environment (AWS).} The stack runs in AWS Africa (Cape Town) (af-south-1) on Amazon EKS. Container images are versioned in Amazon ECR; each release is tagged with both an immutable commit SHA (for provenance) and a moving \texttt{latest} tag (for convenience). Inside the cluster, the API is exposed as a \texttt{ClusterIP} service and remains internal to the VPC. The operator UI is exposed via a \texttt{LoadBalancer} service, which provisions an AWS-managed endpoint for browser access. The UI communicates with the API via cluster DNS, so the scoring service requires no public ingress. Sensitive values (e.g., \texttt{IDS\_API\_TOKEN}) are injected via Kubernetes Secrets as environment variables and are never baked into images. Such EKS-based patterns reflect best practices in cloud-native architecture and secure CI/CD \cite{shevchuk2023}.
 
-\textbf{CI/CD.} A GitHub Actions pipeline automates integration and deployment. It builds the API/UI images, pushes them to ECR, and executes containerised smoke tests (including an automated API Postman collection) against a disposable instance. On success, the pipeline applies the overlay to EKS to roll out the new image. Rollouts are gated by Kubernetes readiness and deployment status, with image provenance preserved by the commit-SHA tag used at deploy time. This automated loop enables reproducible, secure, and fast promotion from development to production, consistent with modern DevOps guidelines \cite{sinde2022}.
+\textbf{CI/CD.} GitHub Actions separate integration and deployment workflows. \texttt{ci.yml} builds the API image and executes the \texttt{pytest} suites. \texttt{deploy.yml} builds and pushes authenticated API and UI releases to ECR, applies Kustomize overlays to EKS, and runs containerised smoke tests via Newman iterating an automated Postman collection. Rollouts are gated by Kubernetes readiness and deployment status, with image provenance preserved by the commit-SHA tag used at deploy time. This automated loop enables reproducible, secure, and fast promotion from development to production, consistent with modern DevOps guidelines \cite{sinde2022}.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{mlops_eks_architecture.pdf}
   \caption[Deployment architecture on AWS EKS (af-south-1).]{\textbf{Deployment pipeline and environment on AWS EKS (af-south-1).}
-  The UI is public behind a Service \texttt{LoadBalancer}; the API is internal behind a Service \texttt{ClusterIP}. The Horizontal Pod Autoscaler (HPA) scales API replicas. Container images are built and pushed by GitHub Actions and deployed to EKS via OIDC assume-role (IRSA); images are stored in Amazon ECR with both tags (e.g., \texttt{latest}) and digests (\texttt{image@sha256}). Secrets flow from AWS Secrets Manager through the External Secrets controller into Kubernetes Secrets and are mounted by pods. The API pulls model bundles and logs metrics to the MLflow Registry.}
+  The UI is public behind a Service \texttt{LoadBalancer}; the API is internal behind a Service \texttt{ClusterIP}. The Horizontal Pod Autoscaler (HPA) scales API replicas. Container images are built and pushed by GitHub Actions to Amazon ECR. GitHub Actions uses configured AWS user credentials to deploy manifests into EKS. Secrets are provisioned into standard Kubernetes Secrets and are mounted as secure environment variables by the API and UI pods. The API pulls model bundles and logs metrics to the MLflow Registry.}
   \label{fig:eks-arch}
 \end{figure}
 
@@ -317,7 +317,7 @@ Our EKS deployment choices shape reliability, security, and cost in ways that ex
 
 \textbf{Boundary \& blast radius.} Exposing only the UI publicly while keeping the API cluster-internal narrows the attack surface and centralizes ingress control. The trade-off is that the UI becomes a chokepoint: if misconfigured, it could relay authenticated calls to the API. This argues for least-privilege secrets in the UI (scoped tokens, short TTL), rate-limiting/WAF at the UI endpoint, and audit trails tying each \texttt{/set\_threshold} or \texttt{/deploy\_registry} to an operator identity. Such layered defenses echo best practices for secure AWS/EKS workloads \cite{algarni2021}.
 
-\textbf{Auth on health.} Guarding \texttt{/health} with the same Bearer policy as production avoids “probe backdoors,” but complicates liveness/readiness. Probes must either (a) authenticate (e.g., \texttt{exec} probe with header) or (b) hit an exempt \texttt{/health} that returns only bundle/process hashes. Current manifests use unauthenticated HTTP probes, which will fail against the auth-guarded endpoint—this should be revised.
+\textbf{Auth on health.} Early iterations guarded \texttt{/health} with the same Bearer policy as other routes to prevent probe backdoors, but this complicated liveness and readiness manifest design. The current implementation exempts \texttt{/health} from authentication, allowing standard Kubernetes HTTP probes to cleanly verify service availability without passing secrets. This aligns with microservice patterns where deep health checks are secure but top-level readiness endpoints are safely public.
 
 \textbf{Autoscaling signal.} A CPU-based HPA aligns with the compute-bound ONNX Runtime path and scales appropriately under sustained load. But it lags on bursty traffic or serialization-heavy workloads, and ignores latency SLOs. If p95 latency becomes critical, request-rate, queue-depth, or custom latency metrics should drive scaling. Research on AI-driven autoscaling in EKS confirms that workload-aware signals improve reliability and cost efficiency compared to static CPU triggers \cite{thota2023}.
 
@@ -327,7 +327,7 @@ Our EKS deployment choices shape reliability, security, and cost in ways that ex
 
 \textbf{Observability that matters.} High-yield signals include:
 \begin{itemize}
-    \item \textbf{Contract:} schema-mismatch rate and 400s at \texttt{/predict(\_proba)}, scaler/bundle load failures, bundle-hash drift.
+    \item \textbf{Contract:} schema-mismatch rate and 422s at \texttt{/predict(\_proba)}, scaler/bundle load failures, bundle-hash drift.
     \item \textbf{Outcomes:} alerts per 1,000 flows, false-alerts per 1,000 negatives, score-distribution drift (label-free proxy).
     \item \textbf{Performance:} p50/p95 inference latency, throughput per replica, UI$\to$API error budgets.
     \item \textbf{Governance:} every threshold change and model reload logged with pre/post $\tau$, model digest, and operator identity.

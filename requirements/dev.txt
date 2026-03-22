@@ -1,5 +1,7 @@
 -r api.txt
 pytest==8.*
+httpx
+onnx
 black
 ruff
 mypy

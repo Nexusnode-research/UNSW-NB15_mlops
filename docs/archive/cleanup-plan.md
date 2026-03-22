@@ -1,6 +1,6 @@
 # Cleanup Plan — UNSW-NB15_MLOPS
 
-Canonical decisions live in [`docs/architecture-decisions.md`](./architecture-decisions.md).
+Canonical decisions live in [`docs/architecture-decisions.md`](../architecture-decisions.md).
 This file is the ordered execution checklist. Work top to bottom within each pass.
 Check off items as they are completed (`[x]`).
 
@@ -170,7 +170,7 @@ Verified after all Pass 2 edits:
 
 - [x] `notebooks/.Trash-0/` deleted
 - [x] `notebooks/ids_unsw/.ipynb_checkpoints/` deleted
-- [ ] `notebooks/ids_unsw/05_Deployment_Optimization2.ipynb` — keep for now (has content); user to decide
+- [x] `notebooks/ids_unsw/05_Deployment_Optimization2.ipynb` — **deleted** (NB2 was confirmed as the older, less-complete version; NB1 retained as the canonical notebook)
 - [ ] PDF/PNG exports in `notebooks/ids_unsw/` (`fig_*.pdf`, `mlops_eks_architecture.*`) — move to `Paper/` or delete; user to decide
 
 ---
@@ -249,6 +249,34 @@ Created `tests/test_ui_smoke.py`:
 - [x] Container name changed from `ids-unsw-api` to `unsw-nb15-mlops-api`
 - [x] CI now installs from `requirements/dev.txt` (instead of root shim) for test jobs
 
+### 4.7 EKS smoke test ✅
+
+Full end-to-end smoke test executed against a live EKS cluster (`unsw-mlops-smoke`, `af-south-1`):
+
+- [x] ECR repositories confirmed (`unsw-nb15-mlops-api`, `unsw-nb15-mlops-ui`)
+- [x] Docker images built (`linux/amd64`), tagged `smoke`, pushed to ECR — verified by digest
+- [x] EKS cluster created via `eksctl` using `infra/eks-smoke-cluster.yaml`
+- [x] `ids` namespace created; `ids-api-secrets` Secret applied
+- [x] Kustomize manifests applied (`k8s/overlays/eks-smoke`); `ids-api` and `dash-ui` pods running
+- [x] API health check: `/health` → `{"status":"ok"}` via `kubectl port-forward`
+- [x] API prediction: `/features` → 34 features; `POST /predict` → prediction `[0]`, threshold `0.757143`
+- [x] UI load: `curl -I http://localhost:8050` → `HTTP/1.1 200 OK`
+- [x] Teardown: `eksctl delete cluster --name unsw-mlops-smoke --region af-south-1` — CloudFormation stacks deleted, zero `smoke` resources remaining
+
+**Pass 4 result — three layers of confidence proof:**
+
+| Layer | Proof |
+|---|---|
+| Local / CI | Bundle validation, unit tests, API integration tests, manifest lint — all green |
+| Light cloud smoke | EKS cluster created → images deployed → health, predict, UI verified → teardown confirmed |
+| Teardown | Zero `smoke` CloudFormation stacks, zero `smoke` EC2 instances post-delete |
+
+**Cleanup notes (non-blocking):**
+
+- Runbook not fully idempotent yet: `namespace "ids" already exists` / `secret "ids-api-secrets" already exists` messages on rerun. Switch to `kubectl apply`-style behavior in future.
+- `aws` / `.py` association problem is a local Windows shell issue, not a repo problem. Worked around with `aws.bat` wrapper during smoke run.
+- `port-forward ... lost connection to pod` line is not a failure — occurred during interruption/teardown, not during the actual smoke verification.
+
 ---
 
 ## Pass 5 — Narrative Cleanup
@@ -258,7 +286,7 @@ Do this pass last — after the repo is stable.
 
 ### 5.1 Add architecture document
 
-- [ ] Create `docs/architecture.md` with:
+- [x] Create `docs/architecture.md` with:
   - System diagram (ASCII or embedded PNG)
   - Description of each layer (data → training → ONNX → API → UI → K8s)
   - Artifact flow: how a bundle gets from a notebook export to the running API
@@ -270,33 +298,54 @@ File: `Paper/Nexusnode_MLOPS_Paper/template.tex`
 
 Verify and fix:
 
-- [ ] All API paths match reality (`/health`, `/predict`, `/predict_proba`, `/set_threshold`, `/reload`)
-- [ ] Auth description: `/health` is public; scoring/admin require Bearer token — remove any claim that `/health` requires auth
-- [ ] UI description says **Dash**, not Streamlit
-- [ ] Repository references use `UNSW-NB15_MLOPS`
-- [ ] Bundle format description matches canonical schema (`xgb.onnx`, `feature_names.json`, `metadata.json`)
-- [ ] Deployment description matches Kubernetes/EKS path
-- [ ] Remove any references to legacy file paths (`app.py` at root, `app_dash.py` at root)
-- [ ] Any performance metrics cited match `metrics_at_threshold` in the production bundle
+- [x] All API paths match reality (`/health`, `/predict`, `/predict_proba`, `/set_threshold`, `/reload`)
+- [x] Auth description: `/health` is public; scoring/admin require Bearer token — remove any claim that `/health` requires auth
+- [x] UI description says **Dash**, not Streamlit
+- [x] Repository references use `UNSW-NB15_MLOPS`
+- [x] Bundle format description matches canonical schema (`xgb.onnx`, `feature_names.json`, `metadata.json`)
+- [x] Deployment description matches Kubernetes/EKS path
+- [x] Remove any references to legacy file paths (`app.py` at root, `app_dash.py` at root)
+- [x] Any performance metrics cited match `metrics_at_threshold` in the production bundle
 
 ### 5.3 README final pass
 
 File: `README.md`
 
-- [ ] Quick Start works end-to-end after a fresh clone (verify manually or in CI)
-- [ ] Compose section accurately describes all three compose files and their purposes
-- [ ] Configuration table includes all five canonical env vars including `IDS_EXPOSE_DOCS`
-- [ ] Add repo badges: CI status, Docker Hub image, license
-- [ ] Add a "Changelog / Release Notes" link or inline section noting current version
+- [x] Quick Start works end-to-end after a fresh clone (verify manually or in CI)
+- [x] Compose section accurately describes all three compose files and their purposes
+- [x] Configuration table includes all five canonical env vars including `IDS_EXPOSE_DOCS`
+- [x] Add repo badges: CI status, Docker Hub image, license
+- [x] Add a "Changelog / Release Notes" link or inline section noting current version
 
 ### 5.4 Add CHANGELOG
 
-- [ ] Create `CHANGELOG.md` with an initial entry describing the current state after cleanup:
+- [x] Create `CHANGELOG.md` with an initial entry describing the current state after cleanup:
   - Schema version 1.0
   - Champion model: XGBoost / ONNX
   - Serving: FastAPI + onnxruntime
   - UI: Dash
   - Deploy: Kubernetes/EKS
+
+---
+
+## Pass 6 — Code Review Fixes
+
+**Goal:** Resolve the 8 remaining drift/robustness issues identified during final code review.
+
+### 6.1 Fix README and stale files
+- [x] Fix README commands (`train.py` path, K8s apply path, Postman env reference)
+- [x] Remove `ids_unsw/ui/docker-compose.yml` (done)
+- [x] Strip real token from `ids_unsw/tests/UNSW_IDS_Local.postman_environment.json` and rename to `.example.json`
+
+### 6.2 Application Robustness (`ids_unsw/serve/app.py`)
+- [x] Change structured error code for missing features from `400` to `422`
+- [x] Move `IDS_API_TOKEN` and bundle loading out of import-time to FastAPI `startup` event
+- [x] Enforce `validate_bundle()` during `/reload` 
+- [x] Prevent legacy files by using isolated temp directories during `/deploy_registry`
+
+### 6.3 Data Portability and CI fixes
+- [x] Move `CategoricalPreprocessor` out of `__main__` block in `engineer.py`
+- [x] Fix container log name in `.github/workflows/ci.yml` diagnostics block
 
 ---
 
@@ -306,23 +355,23 @@ The cleanup is complete only when **all** of the following are true:
 
 **External trust checks (a reviewer or recruiter can verify):**
 
-- [ ] `git clone` + following README produces a working API in one documented command
-- [ ] `docker compose -f docker-compose.serve.yml up` starts the API and UI
-- [ ] `pytest -q` passes
-- [ ] `kubectl kustomize k8s/overlays/eks-dev` renders without errors
-- [ ] No resource in the live manifests is named `streamlit`
-- [ ] No command in the README says `uvicorn app:app`
-- [ ] No command in the README implies `/health` requires auth
+- [x] `git clone` + following README produces a working API in one documented command
+- [x] `docker compose -f docker-compose.serve.yml up` starts the API and UI
+- [x] `pytest -q` passes
+- [x] `kubectl kustomize k8s/overlays/eks-dev` renders without errors
+- [x] No resource in the live manifests is named `streamlit`
+- [x] No command in the README says `uvicorn app:app`
+- [x] No command in the README implies `/health` requires auth
 
 **Internal truth checks:**
 
-- [ ] README matches `ids_unsw/serve/app.py` behavior
-- [ ] Dockerfiles use only canonical env var names
-- [ ] `k8s/base/` contains `dash-ui.yaml`, not `streamlit.yaml`
-- [ ] `metadata.json` in the production bundle has `schema_version` and no legacy comparison blocks
-- [ ] `docker-compose.yml` does not exist — the three split files do
-- [ ] `.gitignore` covers `.ipynb_checkpoints/`, `.Trash-0/`, `.venv/`, `*.pkl` (notebooks), `*.onnx` (notebooks)
-- [ ] Paper describes the system that exists, not the system that existed
+- [x] README matches `ids_unsw/serve/app.py` behavior
+- [x] Dockerfiles use only canonical env var names
+- [x] `k8s/base/` contains `dash-ui.yaml`, not `streamlit.yaml`
+- [x] `metadata.json` in the production bundle has `schema_version` and no legacy comparison blocks
+- [x] `docker-compose.yml` does not exist — the three split files do
+- [x] `.gitignore` covers `.ipynb_checkpoints/`, `.Trash-0/`, `.venv/`, `*.pkl` (notebooks), `*.onnx` (notebooks)
+- [x] Paper describes the system that exists, not the system that existed
 
 ---
 

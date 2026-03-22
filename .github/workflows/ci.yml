@@ -217,7 +217,7 @@ jobs:
           done
           echo "::error::API never became ready. Logs:"
           docker ps -a
-          docker logs ids-unsw-api || true
+          docker logs unsw-nb15-mlops-api || true
           exit 1
       - name: Exercise /features
         run: |
