@@ -1,0 +1,39 @@
+services:
+  ids-api:
+    container_name: unsw-nb15-mlops-api
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - IDS_BUNDLE_DIR=${IDS_BUNDLE_DIR:-notebooks/ids_unsw/models/bundle_xgb}
+      - IDS_SCALER_PATH=${IDS_SCALER_PATH:-notebooks/ids_unsw/models/scaler.pkl}
+      - IDS_API_TOKEN=${IDS_API_TOKEN}
+      - IDS_EXPOSE_DOCS=${IDS_EXPOSE_DOCS:-false}
+    volumes:
+      - ./notebooks/ids_unsw/models:/app/notebooks/ids_unsw/models:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  dash-ui:
+    container_name: unsw-nb15-mlops-ui
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "8050:8050"
+    env_file: .env
+    environment:
+      - IDS_API_URL=http://ids-api:8000
+      - IDS_API_TOKEN=${IDS_API_TOKEN}
+    depends_on:
+      ids-api:
+        condition: service_healthy
+    restart: unless-stopped

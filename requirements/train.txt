@@ -1,0 +1,11 @@
+-r base.txt
+xgboost
+onnx==1.16.*
+onnxruntime==1.18.*
+onnxmltools
+onnxconverter-common
+skl2onnx
+mlflow==3.3.2
+mlflow-skinny==3.3.2
+pyarrow
+tqdm

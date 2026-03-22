@@ -1,4 +1,4 @@
-# UNSW-NB15\_mlops
+# UNSW-NB15_MLOPS
 
 End-to-end, production-style MLOps pipeline for **network intrusion detection** on the **UNSW-NB15** dataset.
 It covers the full stack: **data engineering → model training (XGBoost) → threshold selection → ONNX export → FastAPI service → Dash UI → CI smoke tests → Kubernetes (HPA, probes, kustomize).**
@@ -72,7 +72,7 @@ It covers the full stack: **data engineering → model training (XGBoost) → th
                                            │
                                            ▼
                 ┌─────────────────────────────────────────────┐
-                │  FastAPI (app.py)  + onnxruntime           │
+                │  FastAPI (ids_unsw/serve/app.py)           │
                 │  Endpoints: /health /features /predict*    │
                 │  Auth: Bearer IDS_API_TOKEN                │
                 └───────────────┬────────────────────────────┘
@@ -93,9 +93,11 @@ UNSW-NB15_mlops/
 ├─ ids_unsw/
 │  ├─ features/                # feature engineering scripts
 │  ├─ experiments/             # xgb_to_onnx, threshold, registry helpers
-│  ├─ serve/                   # (optional) server support code
-│  ├─ tests/                   # Postman collection (env example only)
-│  └─ ui/                      # (optional) ui helpers
+│  ├─ serve/
+│  │  └─ app.py                # FastAPI serving entrypoint
+│  ├─ ui/
+│  │  └─ app_dash.py           # Dash UI entrypoint
+│  └─ tests/                   # Postman collection (env example only)
 ├─ notebooks/
 │  └─ ids_unsw/
 │     ├─ data/                 # parquet inputs/outputs (not in git)
@@ -103,10 +105,10 @@ UNSW-NB15_mlops/
 │        └─ bundle_xgb/        # xgb.onnx, feature_names.json, metadata.json
 ├─ tests/                      # pytest bundle tests
 ├─ k8s/                        # kustomize manifests (api, ui, hpa, patches)
-├─ app.py                      # FastAPI server (serving ONNX)
-├─ app_dash.py                 # Dash client
-├─ docker-compose.yml
-├─ mlflow-docker-compose.yml   # optional local MLflow
+├─ docs/                       # architecture decisions and cleanup plan
+├─ docker-compose.dev.yml      # GPU dev/notebook environment (JupyterLab)
+├─ docker-compose.serve.yml    # local API + Dash UI serving stack
+├─ docker-compose.mlflow.yml   # optional local MLflow tracking server
 ├─ requirements.txt
 └─ README.md
 ```
@@ -150,25 +152,33 @@ Run the API:
 export IDS_API_TOKEN="REPLACE_WITH_LONG_RANDOM"
 export IDS_BUNDLE_DIR="notebooks/ids_unsw/models/bundle_xgb"
 export IDS_SCALER_PATH="notebooks/ids_unsw/models/scaler.pkl"
-uvicorn app:app --host 0.0.0.0 --port 8000
+uvicorn ids_unsw.serve.app:app --host 0.0.0.0 --port 8000
 ```
 
 ```powershell
 $env:IDS_API_TOKEN="REPLACE_WITH_LONG_RANDOM"
 $env:IDS_BUNDLE_DIR="notebooks/ids_unsw/models/bundle_xgb"
 $env:IDS_SCALER_PATH="notebooks/ids_unsw/models/scaler.pkl"
-uvicorn app:app --host 0.0.0.0 --port 8000
+uvicorn ids_unsw.serve.app:app --host 0.0.0.0 --port 8000
 ```
 
-Smoke it:
+Smoke it (`/health` is public — no token needed):
 
 ```bash
-curl -H "Authorization: Bearer $IDS_API_TOKEN" http://localhost:8000/health
+curl http://localhost:8000/health
 ```
 
 ### B. Docker Compose
 
-Minimal `docker compose up` for API + Dash UI:
+Three compose files, each with a single purpose:
+
+| File | Purpose |
+|---|---|
+| `docker-compose.dev.yml` | GPU-enabled JupyterLab for training/experiments |
+| `docker-compose.serve.yml` | Local API + Dash UI serving stack |
+| `docker-compose.mlflow.yml` | Optional local MLflow tracking server |
+
+**Local serving stack** (API + Dash UI):
 
 ```bash
 # .env
@@ -178,9 +188,16 @@ IDS_SCALER_PATH=notebooks/ids_unsw/models/scaler.pkl
 ```
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.serve.yml up --build
 # API  : http://localhost:8000
 # DASH : http://localhost:8050
+```
+
+**Dev/notebook environment** (GPU required):
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+# JupyterLab: http://localhost:8888
 ```
 
 ### C. MLflow (optional)
@@ -188,7 +205,7 @@ docker compose up --build
 A convenience Compose stack for **local** MLflow is provided:
 
 ```bash
-docker compose -f mlflow-docker-compose.yml up -d
+docker compose -f docker-compose.mlflow.yml up -d
 export MLFLOW_TRACKING_URI="http://localhost:5000"
 ```
 
@@ -259,18 +276,19 @@ python ids_unsw/experiments/register_onnx.py \
 export IDS_API_TOKEN="REPLACE"
 export IDS_BUNDLE_DIR="notebooks/ids_unsw/models/bundle_xgb"
 export IDS_SCALER_PATH="notebooks/ids_unsw/models/scaler.pkl"
-uvicorn app:app --host 0.0.0.0 --port 8000
+uvicorn ids_unsw.serve.app:app --host 0.0.0.0 --port 8000
 ```
 
-**Endpoints (Bearer auth required):**
+**Endpoints:**
 
-* `GET /health` → status + threshold
-* `GET /features` → list of feature names (e.g., 34)
-* `POST /predict_proba` → returns probabilities
-* `POST /predict` → returns class labels given the current threshold
-* `POST /set_threshold` → update threshold in memory (and persist)
-* `POST /reload` → reload artifacts from bundle dir
-* `POST /deploy_registry` → (optional) pull new model from MLflow registry
+* `GET /health` → status + threshold — **public, no auth required**
+* `GET /features` → list of feature names — Bearer auth required
+* `GET /metadata` → bundle metadata — Bearer auth required
+* `POST /predict_proba` → returns probabilities — Bearer auth required
+* `POST /predict` → returns class labels given the current threshold — Bearer auth required
+* `POST /set_threshold` → update threshold in memory (and persist) — Bearer auth required
+* `POST /reload` → reload artifacts from bundle dir — Bearer auth required
+* `POST /deploy_registry` → (optional) pull new model from MLflow registry — Bearer auth required
 
 **JSON example:**
 
@@ -290,7 +308,7 @@ Run locally:
 ```bash
 export IDS_API_URL="http://localhost:8000"
 export IDS_API_TOKEN="REPLACE"
-python app_dash.py
+python ids_unsw/ui/app_dash.py
 # http://localhost:8050
 ```
 
@@ -303,7 +321,7 @@ It fetches `/features` to build an input form, lets you **score** rows/CSV, twea
 This repo ships **kustomize** resources and patches for a token-protected API:
 
 * **Deployments/Services** for API and UI
-* **Readiness/Liveness** probes using `curl -H "Authorization: Bearer $IDS_API_TOKEN" /health`
+* **Readiness/Liveness** probes using `curl /health` — no auth required on this endpoint
 * **HPA** (autoscaling/v2) on CPU (or extend to custom metrics)
 * **metrics-server** Service patch (common port/name mismatch fix)
 
@@ -363,13 +381,14 @@ Import the **collection**, **duplicate** the example env, insert your token, and
 
 ## Configuration & Environment Variables
 
-| Variable              | Where         | Description                                                      |
-| --------------------- | ------------- | ---------------------------------------------------------------- |
-| `IDS_API_TOKEN`       | API, UI, K8s  | **Required** Bearer token for API auth                           |
+| Variable              | Where         | Description                                                       |
+| --------------------- | ------------- | ----------------------------------------------------------------- |
+| `IDS_API_TOKEN`       | API, UI, K8s  | **Required** Bearer token — all endpoints except `/health`        |
 | `IDS_BUNDLE_DIR`      | API           | Directory with `xgb.onnx`, `feature_names.json`, `metadata.json` |
-| `IDS_SCALER_PATH`     | API           | Path to `scaler.pkl`                                             |
-| `IDS_API_URL`         | Dash UI       | Base URL of API (e.g., `http://ids-api:8000`)                    |
-| `MLFLOW_TRACKING_URI` | Training/Exp. | Optional MLflow server URI (e.g., `http://localhost:5000`)       |
+| `IDS_SCALER_PATH`     | API           | Path to `scaler.pkl`                                              |
+| `IDS_API_URL`         | Dash UI       | Base URL of API (e.g., `http://ids-api:8000`)                     |
+| `IDS_EXPOSE_DOCS`     | API           | `true`/`false` — controls `/docs` and `/openapi.json` exposure    |
+| `MLFLOW_TRACKING_URI` | Training/Exp. | Optional MLflow server URI (e.g., `http://localhost:5000`)        |
 
 **.gitignore** includes env/secrets patterns. Keep **real tokens out of git**.
 
@@ -395,7 +414,7 @@ Import the **collection**, **duplicate** the example env, insert your token, and
 
 ## Troubleshooting
 
-* **`/health` 401/403** → missing/incorrect `Authorization: Bearer <IDS_API_TOKEN>`.
+* **`/health` returns 401/403** → `/health` is intentionally public and should never require auth. If it returns 401, there is a middleware misconfiguration — check that no global auth dependency wraps all routes.
 * **`onnxruntime` errors** → check that your `xgb.onnx` matches the trained model and your `feature_names.json` ordering.
 * **Wrong feature count** → regenerate `feature_names.json` to match engineering, or update tests.
 * **HPA doesn’t scale / `kubectl top` empty** → ensure `metrics-server` is running; apply the `metrics-server` service patch if needed.

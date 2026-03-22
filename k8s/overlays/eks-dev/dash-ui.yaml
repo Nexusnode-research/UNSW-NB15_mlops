@@ -1,24 +1,18 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dash-ui
   namespace: ids
 spec:
   replicas: 2
-  selector:
-    matchLabels: { app: dash-ui }
   template:
-    metadata:
-      labels: { app: dash-ui }
     spec:
       containers:
         - name: ui
-          image: 002232587129.dkr.ecr.af-south-1.amazonaws.com/ids-ui:latest
+          image: 002232587129.dkr.ecr.af-south-1.amazonaws.com/unsw-nb15-mlops-ui:latest
           imagePullPolicy: Always
           command: ["gunicorn"]
           args: ["-b","0.0.0.0:8050","-w","2","--threads","4","--timeout","120","--access-logfile","-","ids_unsw.ui.app_dash:server"]
-          ports:
-            - containerPort: 8050
           env:
             - name: IDS_API_URL
               value: http://ids-api:8000

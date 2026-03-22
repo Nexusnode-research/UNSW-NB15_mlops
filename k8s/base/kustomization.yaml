@@ -1,4 +1,4 @@
 namespace: ids
 resources:
-  - streamlit.yaml
   - ids-api.yaml
+  - dash-ui.yaml

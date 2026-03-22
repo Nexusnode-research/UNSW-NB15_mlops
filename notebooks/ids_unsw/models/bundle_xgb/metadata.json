@@ -1,70 +1,24 @@
 {
-  "rf": {
-    "threshold": 0.6142
-  },
-  "features": [
-    "dur",
-    "proto",
-    "service",
-    "state",
-    "spkts",
-    "dpkts",
-    "sbytes",
-    "dbytes",
-    "rate",
-    "sload",
-    "dload",
-    "sloss",
-    "dloss",
-    "sinpkt",
-    "dinpkt",
-    "sjit",
-    "djit",
-    "swin",
-    "stcpb",
-    "dtcpb",
-    "dwin",
-    "tcprtt",
-    "synack",
-    "ackdat",
-    "smean",
-    "dmean",
-    "trans_depth",
-    "response_body_len",
-    "ct_src_dport_ltm",
-    "ct_dst_sport_ltm",
-    "is_ftp_login",
-    "ct_ftp_cmd",
-    "ct_flw_http_mthd",
-    "is_sm_ips_ports"
-  ],
-  "xgboost": {
-    "threshold": 0.7508,
-    "metrics": {
-      "precision": 0.5666675079501288,
-      "recall": 0.9905806053119209,
-      "f1": 0.7209253788851785,
-      "roc_auc": 0.33699189821163267
-    },
-    "confusion": {
-      "TP": 44905,
-      "FP": 34339,
-      "TN": 2661,
-      "FN": 427
-    }
-  },
-  "champion": "xgboost",
-  "threshold": 0.6285714285714286,
+  "schema_version": "1.0",
+  "project_name": "UNSW-NB15_MLOPS",
+  "model_family": "xgboost",
+  "artifact_format": "onnx",
   "n_features": 34,
+  "threshold": 0.757143,
+  "feature_source": "feature_names.json",
   "metrics_at_threshold": {
-    "precision": 0.8676957001102535,
-    "recall": 0.9548442601252978,
-    "f1": 0.9091863847842298,
-    "roc_auc": 0.9804846579350903,
-    "FPR": 0.1783783783783784,
-    "TP": 43285,
-    "FP": 6600,
-    "TN": 30400,
-    "FN": 2047
+    "precision": 0.9381473409872161,
+    "recall":    0.9211153269213801,
+    "f1":        0.9295533219799423,
+    "roc_auc":   0.9805389430174021,
+    "fpr":       0.07440540540540541,
+    "tp":        41756,
+    "fp":        2753,
+    "tn":        34247,
+    "fn":        3576
+  },
+  "training_context": {
+    "dataset": "UNSW-NB15",
+    "recall_min_constraint": 0.95
   }
 }

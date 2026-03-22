@@ -1,3 +1,6 @@
+# GPU-enabled development/notebook environment for UNSW-NB15_MLOPS.
+# Uses the TensorFlow GPU base image for CUDA availability; this project's
+# champion model is XGBoost/ONNX — TensorFlow itself is not used for serving.
 FROM tensorflow/tensorflow:latest-gpu
 
 # Optional CUDA libs TF may touch + Git
@@ -26,6 +29,6 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/lib/wsl/lib:/usr/local/lib/pytho
 # Point the client at your existing MLflow server (override via compose/env if needed)
 ENV MLFLOW_TRACKING_URI="http://host.docker.internal:5000"
 
-WORKDIR /tf
+WORKDIR /workspace
 CMD ["bash","-lc","jupyter lab --ip=0.0.0.0 --no-browser --allow-root --ServerApp.token='' --ServerApp.password=''"]
 

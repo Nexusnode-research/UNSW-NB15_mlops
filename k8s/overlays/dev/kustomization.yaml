@@ -2,11 +2,12 @@ resources:
   - ../../base
   - ids-api-hpa.yaml
 
+# Note: metrics-server patching is handled separately via:
+#   kubectl apply -k k8s/system/metrics-server/
 patches:
-  - path: metrics-server-svc-patch.yaml
   - target:
       kind: Service
-      name: streamlit
+      name: dash-ui
     patch: |-
       - op: replace
         path: /spec/type

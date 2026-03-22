@@ -1,0 +1,10 @@
+resources:
+  - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+patches:
+  - path: svc-patch.yaml
+    target:
+      group: ""
+      version: v1
+      kind: Service
+      name: metrics-server
+      namespace: kube-system

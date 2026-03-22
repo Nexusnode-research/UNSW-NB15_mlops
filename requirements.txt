@@ -1,6 +1,7 @@
-onnx==1.16.*
-onnxruntime==1.18.*
-numpy==1.26.*
-pytest==8.*
-
-mlflow==2.14.*
+# Convenience shim — installs the full API + dev stack.
+# Use specific files in requirements/ for targeted installs:
+#   requirements/api.txt   — API serving only
+#   requirements/ui.txt    — Dash UI only
+#   requirements/train.txt — model training and export
+#   requirements/dev.txt   — development tools (includes api.txt)
+-r requirements/dev.txt

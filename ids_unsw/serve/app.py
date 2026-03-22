@@ -7,7 +7,7 @@ from threading import Lock
 
 import numpy as np
 import onnxruntime as ort
-from fastapi import FastAPI, HTTPException, Body, Depends, Security
+from fastapi import FastAPI, HTTPException, Body, Depends, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 import mlflow
@@ -23,14 +23,22 @@ SCALER_PATH = Path(os.getenv("IDS_SCALER_PATH", "notebooks/ids_unsw/models/scale
 # This is derived from the context, assuming MODELS is the parent of BUNDLE
 MODELS = MODEL_BASE.parent
 
-# ---- Auth (required for all endpoints) ----
+# ---- Auth ----
 API_TOKEN = os.getenv("IDS_API_TOKEN")
 if not API_TOKEN:
-    # Fail fast so you don't accidentally run without a token
-    raise RuntimeError("IDS_API_TOKEN environment variable is required for this API.")
+    raise RuntimeError("IDS_API_TOKEN environment variable is required.")
 
-_bearer = HTTPBearer(auto_error=True)
-def require_token(creds: HTTPAuthorizationCredentials = Security(_bearer)):
+# ---- Docs exposure ----
+# Set IDS_EXPOSE_DOCS=true to enable /docs and /openapi.json (e.g. during local dev).
+# Defaults to disabled.
+_expose_docs = os.getenv("IDS_EXPOSE_DOCS", "false").lower() == "true"
+_docs_url    = "/docs"        if _expose_docs else None
+_openapi_url = "/openapi.json" if _expose_docs else None
+
+_bearer = HTTPBearer(auto_error=False)
+def require_token(request: Request, creds: HTTPAuthorizationCredentials = Security(_bearer)):
+    if request.url.path == "/health":
+        return
     if not creds or creds.scheme.lower() != "bearer" or creds.credentials != API_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -86,10 +94,36 @@ except NameError:
 
 # ------------ FastAPI setup ------------
 app = FastAPI(
-    title="UNSW IDS – XGBoost ONNX API",
+    title="UNSW-NB15_MLOPS — IDS API",
     version="1.0",
-    dependencies=[Depends(require_token)]
+    docs_url=_docs_url,
+    openapi_url=_openapi_url,
+    dependencies=[Depends(require_token)],
 )
+
+@app.on_event("startup")
+async def startup_validation():
+    """Validate bundle integrity at startup; abort with a clear message if anything is wrong."""
+    required_files = [
+        MODEL_BASE / "xgb.onnx",
+        MODEL_BASE / "feature_names.json",
+        MODEL_BASE / "metadata.json",
+    ]
+    missing = [str(p) for p in required_files if not p.exists()]
+    if not SCALER_PATH.exists():
+        missing.append(str(SCALER_PATH))
+    if missing:
+        raise RuntimeError(
+            f"Bundle validation failed — missing files: {missing}. "
+            f"Set IDS_BUNDLE_DIR and IDS_SCALER_PATH correctly."
+        )
+    meta = json.loads((MODEL_BASE / "metadata.json").read_text())
+    if "threshold" not in meta:
+        raise RuntimeError("metadata.json is missing required key 'threshold'.")
+    if "schema_version" not in meta:
+        import warnings
+        warnings.warn("metadata.json is missing 'schema_version' — consider regenerating.", stacklevel=2)
+
 
 class PredictRequest(BaseModel):
     # A list of feature dictionaries (keys must match feature_names.json)

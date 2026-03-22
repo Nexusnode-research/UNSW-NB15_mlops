@@ -1,2 +1,14 @@
+﻿# --- Binary model artifacts (Git LFS) ---
 *.pkl filter=lfs diff=lfs merge=lfs -text
 *.onnx filter=lfs diff=lfs merge=lfs -text
+
+# --- Text files: enforce LF line endings ---
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# --- Explicitly binary (no diff/merge) ---
+*.pdf -text
+*.png -text
+*.jpg -text
+*.jpeg -text

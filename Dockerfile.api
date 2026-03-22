@@ -20,22 +20,17 @@ COPY notebooks/ids_unsw/models/scaler.pkl \
 COPY notebooks/ids_unsw/models/bundle_xgb \
      notebooks/ids_unsw/models/bundle_xgb
 
-# Runtime deps
-RUN pip install --no-cache-dir \
-    fastapi==0.115.* "uvicorn[standard]==0.30.*" \
-    numpy==1.26.* pandas==2.2.* \
-    scikit-learn==1.7.1 \
-    onnxruntime==1.18.* \
-    mlflow==3.3.2
+COPY requirements/base.txt requirements/api.txt requirements/
+RUN pip install --no-cache-dir -r requirements/api.txt
 
-ENV MODEL_BASE=/app/notebooks/ids_unsw/models \
-    BUNDLE_DIR=/app/notebooks/ids_unsw/models/bundle_xgb \
+ENV IDS_BUNDLE_DIR=/app/notebooks/ids_unsw/models/bundle_xgb \
+    IDS_SCALER_PATH=/app/notebooks/ids_unsw/models/scaler.pkl \
     PORT=8000
 
 EXPOSE 8000
+# /health is intentionally public — no auth header required
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
-  CMD curl -fsS -H "Authorization: Bearer ${IDS_API_TOKEN}" \
-      http://127.0.0.1:${PORT}/health || exit 1
+  CMD curl -fsS http://127.0.0.1:${PORT}/health || exit 1
 
 
 ENTRYPOINT ["/usr/bin/tini","--"]

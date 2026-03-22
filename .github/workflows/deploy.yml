@@ -1,4 +1,4 @@
-name: Build & Deploy to EKS
+name: UNSW-NB15_MLOPS — Build & Deploy to EKS
 
 on:
   push:
@@ -10,8 +10,8 @@ env:
   ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
   EKS_CLUSTER: ${{ secrets.EKS_CLUSTER }}
   K8S_NAMESPACE: ${{ secrets.K8S_NAMESPACE }}
-  API_IMAGE: ids-unsw-api
-  UI_IMAGE: ids-ui
+  API_IMAGE: unsw-nb15-mlops-api
+  UI_IMAGE: unsw-nb15-mlops-ui
   IDS_API_TOKEN: ${{ secrets.IDS_API_TOKEN }}
 
 jobs:
@@ -56,11 +56,10 @@ jobs:
             -p 8000:8000 \
             "$ECR_REGISTRY/$API_IMAGE:${GITHUB_SHA}"
 
-      - name: Wait for /health with token
+      - name: Wait for /health (public endpoint, no auth required)
         run: |
           for i in {1..90}; do
-            if curl -fsS -H "Authorization: Bearer ${IDS_API_TOKEN}" \
-                 http://localhost:8000/health >/dev/null; then
+            if curl -fsS http://localhost:8000/health >/dev/null; then
               echo "API is healthy"; exit 0
             fi
             if ! docker ps --format '{{.Names}}' | grep -q '^api-under-test$'; then

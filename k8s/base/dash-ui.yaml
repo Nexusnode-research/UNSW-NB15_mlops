@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: streamlit
+  name: dash-ui
   namespace: ids
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: streamlit
+      app: dash-ui
   template:
     metadata:
       labels:
-        app: streamlit
+        app: dash-ui
     spec:
       containers:
         - name: ui
-          image: ids_ui:latest            # <— change if your tag is different
-          imagePullPolicy: IfNotPresent   # use local image if present
+          image: unsw-nb15-mlops-ui:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8050
           env:
-            - name: API_BASE_URL
-              value: "http://ids-api:8000"  # we'll create this service later
+            - name: IDS_API_URL
+              value: "http://ids-api:8000"
           readinessProbe:
             httpGet:
               path: /
@@ -32,12 +32,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: streamlit
+  name: dash-ui
   namespace: ids
 spec:
   type: ClusterIP
   selector:
-    app: streamlit
+    app: dash-ui
   ports:
     - name: http
       port: 8050

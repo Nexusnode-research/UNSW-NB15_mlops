@@ -1,4 +1,4 @@
-name: CI
+name: UNSW-NB15_MLOPS CI
 on:
   push:
     branches: [ "main" ]
@@ -14,7 +14,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 env:
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/ids-unsw-api
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/unsw-nb15-mlops-api
 
 jobs:
   test:
@@ -30,16 +30,20 @@ jobs:
       - name: Run tests
         run: pytest -q
 
-# --- new job: DATA -----------------------------------------------------------
+# --- SMOKE FIXTURES (data / features / train) --------------------------------
+# These jobs exercise the CI pipeline shape using a tiny synthetic dataset.
+# They are NOT real training runs. They validate that the pipeline plumbing
+# works end-to-end without requiring the full UNSW-NB15 dataset.
+# ----------------------------------------------------------------------------
   data:
     runs-on: ubuntu-latest
-    needs: [test]         # optional: run after unit/bundle tests
+    needs: [test]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
       - run: pip install -r requirements.txt
-      - name: Create tiny raw dataset
+      - name: "Smoke: create synthetic raw dataset"
         run: |
           python - <<'PY'
           import pandas as pd, numpy as np, pathlib
@@ -56,7 +60,6 @@ jobs:
         with:
           name: raw
           path: artifacts/raw
-# --- new job: FEATURES -------------------------------------------------------
   features:
     runs-on: ubuntu-latest
     needs: [data]
@@ -69,7 +72,7 @@ jobs:
         with:
           name: raw
           path: work/raw
-      - name: Build features
+      - name: "Smoke: build synthetic features"
         run: |
           python - <<'PY'
           import pandas as pd, json, pathlib
@@ -89,7 +92,6 @@ jobs:
         with:
           name: features
           path: artifacts/features
-# --- new job: TRAIN ----------------------------------------------------------
   train:
     runs-on: ubuntu-latest
     needs: [features]
@@ -102,7 +104,7 @@ jobs:
         with:
           name: features
           path: work/features
-      - name: Train & log with MLflow
+      - name: "Smoke: synthetic train — pipeline contract check (not real training)"
         run: |
           python - <<'PY'
           import pandas as pd, numpy as np, pathlib, json, mlflow, os, shutil
@@ -158,11 +160,10 @@ jobs:
           docker run -d --name ids-unsw-api -p 8000:8000 \
             -e IDS_API_TOKEN=${{ secrets.IDS_API_TOKEN }} \
             ids-unsw-api:local
-      - name: Wait for API (max 60s)
+      - name: Wait for API — /health is public, no auth required (max 60s)
         run: |
           for i in {1..30}; do
-            if curl -fsS -H "Authorization: Bearer ${{ secrets.IDS_API_TOKEN }}" \
-                 http://localhost:8000/health | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
+            if curl -fsS http://localhost:8000/health | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
               echo "API is up"; exit 0
             fi
             echo "waiting for API... ($i)"; sleep 2

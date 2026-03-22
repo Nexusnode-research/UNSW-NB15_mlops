@@ -1,0 +1,6 @@
+-r api.txt
+pytest==8.*
+black
+ruff
+mypy
+pre-commit

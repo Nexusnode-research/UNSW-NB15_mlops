@@ -1,25 +1,20 @@
-﻿# Dockerfile.ui — Dash on port 8050
+# Dash UI image for UNSW-NB15_MLOPS
 FROM python:3.11-slim
 
-# System deps
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends tini curl \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install your existing deps if present
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt || true
+COPY requirements/ui.txt requirements/
+RUN pip install --no-cache-dir -r requirements/ui.txt
 
-# Ensure Dash + gunicorn + bootstrap components are there
-RUN pip install --no-cache-dir dash==2.17.* gunicorn==22.* dash-bootstrap-components
-
-# Copy your full project into the image
-COPY . /app
+COPY ids_unsw ./ids_unsw
 
 EXPOSE 8050
-
-# Entry point — use gunicorn to serve your Dash app
-# IMPORTANT: module path points at ids_unsw/ui/app_dash.py
-# Inside that file you must have: app = Dash(__name__); server = app.server
-CMD ["gunicorn", "-b", "0.0.0.0:8050", "ids_unsw.ui.app_dash:server"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["gunicorn", "-b", "0.0.0.0:8050", "-w", "2", "--timeout", "120", "ids_unsw.ui.app_dash:server"]
