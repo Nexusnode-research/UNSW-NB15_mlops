@@ -23,6 +23,20 @@ spec:
               value: /app/notebooks/ids_unsw/models/scaler.pkl
             - name: IDS_EXPOSE_DOCS
               value: "true"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
           resources:
             requests:
               cpu: "200m"

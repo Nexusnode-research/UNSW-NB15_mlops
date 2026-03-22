@@ -11,7 +11,6 @@ from fastapi import FastAPI, HTTPException, Body, Depends, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 import mlflow
-from mlflow import tracking
 from mlflow.tracking import MlflowClient
 from mlflow.artifacts import download_artifacts
 

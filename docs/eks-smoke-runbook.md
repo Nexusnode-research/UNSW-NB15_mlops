@@ -56,6 +56,17 @@ $ACCOUNT = "002232587129"
 $REG     = "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
 $TAG     = "smoke"
 
+# IMPORTANT: hydrate LFS files before building.
+# scaler.pkl and xgb.onnx are tracked by Git LFS.
+# Without this step, Docker will COPY empty LFS pointer text files
+# and the API will fail at startup with a bundle validation error.
+git lfs pull
+
+# Confirm the real files are present (not LFS pointers)
+# scaler.pkl should be > 1 KB; xgb.onnx should be ~1.9 MB
+Get-Item notebooks/ids_unsw/models/scaler.pkl | Select-Object Name, Length
+Get-Item notebooks/ids_unsw/models/bundle_xgb/xgb.onnx | Select-Object Name, Length
+
 # Authenticate Docker to ECR
 aws ecr get-login-password --region $REGION |
   docker login --username AWS --password-stdin $REG
