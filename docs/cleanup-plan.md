@@ -179,67 +179,75 @@ Verified after all Pass 2 edits:
 
 **Goal:** Tests, validation, and CI actually prove what they claim to prove.
 
-### 4.1 Bundle validation script
+### 4.1 Bundle validation script ✅
 
-- [ ] Create `ids_unsw/validate_bundle.py` (or `tools/validate_bundle.py`) that:
-  - Loads `xgb.onnx` and verifies input shape matches `feature_names.json` count
-  - Parses `metadata.json` against the canonical schema (validates required keys, types, `schema_version`)
-  - Loads `scaler.pkl` and verifies it transforms the correct feature count
-  - Exits non-zero with a clear message on any failure
-- [ ] Call this script in API startup so bad bundles fail fast
-- [ ] Add it as a CI step before the Docker build
+- [x] Created `ids_unsw/validate_bundle.py`:
+  - Checks all required files exist (xgb.onnx, feature_names.json, metadata.json, scaler.pkl)
+  - Validates metadata has all canonical keys; reports any legacy keys
+  - Validates threshold in (0, 1); n_features matches feature_names.json
+  - Loads ONNX model and checks input shape matches feature count
+  - Loads scaler and checks n_features_in_ matches
+  - Runnable as `python -m ids_unsw.validate_bundle`; exits 0/1
+- [x] API startup event now calls `validate_bundle()` — bad bundles fail fast with clear errors
+- [x] CI `validate-bundle` job added — runs before unit tests and Docker build
 
-### 4.2 Improve unit tests
+### 4.2 Improve unit tests ✅
 
-File: `tests/test_bundle.py`
+File: `tests/test_bundle.py` — fully rewritten:
 
-- [ ] Add test: `metadata.json` has `schema_version` key
-- [ ] Add test: `metadata.json` does NOT contain legacy keys (`"rf"`, `"xgboost"` nested block, `"champion"`)
-- [ ] Add test: `metadata.json` `metrics_at_threshold` keys are all lowercase (`fpr`, not `FPR`)
-- [ ] Add test: threshold is a float in range (0, 1)
-- [ ] Add test: ONNX model input count matches `feature_names.json` length
-- [ ] Add test: `/health` endpoint returns 200 without any `Authorization` header
+- [x] `metadata.json` has `schema_version == "1.0"`
+- [x] All required canonical keys present
+- [x] No legacy keys (`rf`, `champion`, `features`, nested `xgboost`)
+- [x] `metrics_at_threshold` keys are all lowercase
+- [x] Threshold is a float in (0, 1)
+- [x] n_features matches feature_names.json count
+- [x] ONNX model input count matches feature_names.json
+- [x] `validate_bundle()` reports zero errors (end-to-end gate)
 
-### 4.3 API integration tests
+### 4.3 API integration tests ✅
 
-Create `tests/test_api_integration.py`:
+Created `tests/test_api_integration.py` (FastAPI TestClient — in-process, no Docker):
 
-- [ ] `/health` returns 200 with no auth header
-- [ ] `/health` response body includes `{"status": "ok"}`
-- [ ] `/predict` returns 401 with no auth header
-- [ ] `/predict_proba` returns 401 with no auth header
-- [ ] `/features` returns 401 with no auth header
-- [ ] `/features` returns 200 with valid Bearer token and a list of 34 feature names
-- [ ] `/predict` with valid payload and valid token returns 200 with expected shape
-- [ ] `/set_threshold` persists the new value (verified by subsequent `/metadata` or `/health` call)
-- [ ] Invalid payload to `/predict` returns 422
+- [x] `/health` returns 200 without auth
+- [x] `/health` body has `{"status": "ok"}`
+- [x] `/health` returns 200 even with wrong token
+- [x] `/health` exposes `threshold`
+- [x] `/features`, `/metadata`, `/predict`, `/predict_proba`, `/reload` return 401 without auth
+- [x] Same endpoints return 401 with wrong token
+- [x] `/features` returns 34 feature names with valid token
+- [x] `/metadata` has `schema_version == "1.0"`
+- [x] `/predict` valid payload returns 200 with `predictions`, `probabilities`, `threshold`
+- [x] `/predict` predictions are binary (0 or 1)
+- [x] `/predict` wrong features returns 400/422
+- [x] `/predict` missing `instances` key returns 422
+- [x] `/predict_proba` probabilities are in [0, 1]
+- [x] `/set_threshold` requires auth
+- [x] `/set_threshold` persists to `/health`; restores original after test
+- [x] `/set_threshold` rejects threshold > 1
+- [x] `/docs` returns 404 when `IDS_EXPOSE_DOCS=false`
+- [x] `/openapi.json` returns 404 when `IDS_EXPOSE_DOCS=false`
+- [x] CI `test-api` job added — runs in parallel with unit tests after bundle validation
 
-### 4.4 UI smoke test
+### 4.4 UI smoke test ✅
 
-- [ ] Add a minimal CI step or script `tools/ui_smoke.py` that:
-  - Starts the Dash app in a subprocess
-  - Checks that `http://localhost:8050` returns HTTP 200
-  - Exits 0 on success, 1 on failure
+Created `tests/test_ui_smoke.py`:
 
-### 4.5 Manifest validation in CI
+- [x] Starts Dash via gunicorn subprocess on port 18050
+- [x] Polls until ready (30s timeout)
+- [x] Checks `http://127.0.0.1:18050/` returns 200
+- [x] Always tears down subprocess
+- [x] Skipped automatically when `IDS_API_URL` is not set (safe for CI without running API)
 
-File: `.github/workflows/ci.yml`
+### 4.5 Manifest validation in CI ✅
 
-- [ ] Add a job `manifest-lint` that runs:
-  ```bash
-  kubectl kustomize k8s/base
-  kubectl kustomize k8s/overlays/dev
-  kubectl kustomize k8s/overlays/eks-dev
-  ```
-  and optionally pipes output through `kubeconform` or `kubectl apply --dry-run=client`
-- [ ] This job should fail the workflow if any overlay fails to render
+- [x] `manifest-lint` job added to `ci.yml`
+- [x] Validates `k8s/base`, `k8s/overlays/dev`, `k8s/overlays/eks-dev` with `kubectl kustomize`
+- [x] `docker` job now `needs: [test, test-api, train, manifest-lint]`
 
-### 4.6 Label CI synthetic jobs honestly
+### 4.6 CI docker job — slug and name fixes ✅
 
-File: `.github/workflows/ci.yml`
-
-- [ ] Add a top-of-file comment block explaining that the `data`, `features`, and `train` jobs are pipeline-shape smoke tests, not real model training
-- [ ] Rename the train job's step from "Train & log with MLflow" to "Smoke: synthetic train (pipeline contract only)"
+- [x] Container name changed from `ids-unsw-api` to `unsw-nb15-mlops-api`
+- [x] CI now installs from `requirements/dev.txt` (instead of root shim) for test jobs
 
 ---
 

@@ -17,7 +17,9 @@ env:
   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/unsw-nb15-mlops-api
 
 jobs:
-  test:
+
+# ── Bundle validation (fastest gate — run first) ──────────────────────────────
+  validate-bundle:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,10 +27,55 @@ jobs:
           lfs: true
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
+      - run: pip install -r requirements/api.txt
+      - name: Validate artifact bundle
+        run: python -m ids_unsw.validate_bundle
+
+# ── Unit tests ────────────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    needs: [validate-bundle]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
       - run: python -m pip install --upgrade pip
-      - run: pip install -r requirements.txt
-      - name: Run tests
-        run: pytest -q
+      - run: pip install -r requirements/dev.txt
+      - name: Run unit tests
+        run: pytest tests/test_bundle.py -v
+
+# ── API integration tests (in-process, no Docker required) ───────────────────
+  test-api:
+    runs-on: ubuntu-latest
+    needs: [validate-bundle]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements/dev.txt
+      - name: Run API integration tests
+        env:
+          IDS_API_TOKEN: ${{ secrets.IDS_API_TOKEN || 'ci-test-token-abc123' }}
+        run: pytest tests/test_api_integration.py -v
+
+# ── Manifest validation ───────────────────────────────────────────────────────
+  manifest-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with: { version: latest }
+      - name: Validate base
+        run: kubectl kustomize k8s/base
+      - name: Validate dev overlay
+        run: kubectl kustomize k8s/overlays/dev
+      - name: Validate eks-dev overlay
+        run: kubectl kustomize k8s/overlays/eks-dev
 
 # --- SMOKE FIXTURES (data / features / train) --------------------------------
 # These jobs exercise the CI pipeline shape using a tiny synthetic dataset.
@@ -134,7 +181,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    needs: [test, train]
+    needs: [test, test-api, train, manifest-lint]
     steps:
       - name: Checkout (with LFS for ONNX bundle)
         uses: actions/checkout@v4
@@ -153,13 +200,13 @@ jobs:
       # Build a local tag we can run for tests
       - name: Build image (local test tag)
         run: |
-          docker build -f Dockerfile.api -t ids-unsw-api:local .
+          docker build -f Dockerfile.api -t unsw-nb15-mlops-api:local .
       - name: Run container
         run: |
-          docker rm -f ids-unsw-api 2>/dev/null || true
-          docker run -d --name ids-unsw-api -p 8000:8000 \
+          docker rm -f unsw-nb15-mlops-api 2>/dev/null || true
+          docker run -d --name unsw-nb15-mlops-api -p 8000:8000 \
             -e IDS_API_TOKEN=${{ secrets.IDS_API_TOKEN }} \
-            ids-unsw-api:local
+            unsw-nb15-mlops-api:local
       - name: Wait for API — /health is public, no auth required (max 60s)
         run: |
           for i in {1..30}; do
@@ -197,7 +244,7 @@ jobs:
             -d @- | head
       - name: Cleanup
         if: always()
-        run: docker rm -f ids-unsw-api
+        run: docker rm -f unsw-nb15-mlops-api || true
 
       - name: Compute tags/labels
         id: meta

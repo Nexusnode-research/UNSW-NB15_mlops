@@ -103,26 +103,15 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_validation():
-    """Validate bundle integrity at startup; abort with a clear message if anything is wrong."""
-    required_files = [
-        MODEL_BASE / "xgb.onnx",
-        MODEL_BASE / "feature_names.json",
-        MODEL_BASE / "metadata.json",
-    ]
-    missing = [str(p) for p in required_files if not p.exists()]
-    if not SCALER_PATH.exists():
-        missing.append(str(SCALER_PATH))
-    if missing:
-        raise RuntimeError(
-            f"Bundle validation failed — missing files: {missing}. "
-            f"Set IDS_BUNDLE_DIR and IDS_SCALER_PATH correctly."
+    """Validate bundle integrity at startup using the canonical validator."""
+    from ids_unsw.validate_bundle import validate_bundle
+
+    errors = validate_bundle(MODEL_BASE, SCALER_PATH)
+    if errors:
+        msg = "Bundle validation failed at startup:\n" + "\n".join(
+            f"  - {e}" for e in errors
         )
-    meta = json.loads((MODEL_BASE / "metadata.json").read_text())
-    if "threshold" not in meta:
-        raise RuntimeError("metadata.json is missing required key 'threshold'.")
-    if "schema_version" not in meta:
-        import warnings
-        warnings.warn("metadata.json is missing 'schema_version' — consider regenerating.", stacklevel=2)
+        raise RuntimeError(msg)
 
 
 class PredictRequest(BaseModel):
