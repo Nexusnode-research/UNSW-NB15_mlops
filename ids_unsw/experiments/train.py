@@ -240,6 +240,9 @@ def main():
                     f"Val AUC: {val_metrics['roc_auc']:.4f}"
                 )
 
+            # Last epoch's val_metrics: full dict for papers (precision/recall at τ=0.5)
+            print("VAL metrics (final epoch, τ=0.5):", val_metrics)
+
             exp = mlflow.get_experiment_by_name(args.mlflow_exp)
             if exp is not None:
                 print(f"⯑ View run logreg_torch_gpu at: {args.mlflow_uri}/#/experiments/{exp.experiment_id}/runs/{run.info.run_id}")
