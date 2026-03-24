@@ -8,7 +8,7 @@
 This document serves as the canonical proof of the end-to-end cloud deployment and verification of the UNSW-NB15_MLOPS system.
 
 ## 1. Local / CI Confidence
-Prior to cloud deployment, the following local gates were verified:
+Prior to cloud deployment, the following local gates were verified (same checks as in the GitHub Actions CI workflow when run manually or on a PR to `main`; pushes alone do not trigger CI):
 * **Bundle Validation:** `ids_unsw.validate_bundle` passed.
 * **Unit Tests:** Canonical schema validation and legacy key rejection verified via `pytest`.
 * **API Integration:** FastAPI test client verified all endpoint contracts (auth, payloads, responses).

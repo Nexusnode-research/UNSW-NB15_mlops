@@ -1,7 +1,8 @@
+# Triggers: not on ordinary pushes to main (saves minutes / avoids noisy runs).
+# — pull_request → runs when a PR targets main (pre-merge checks).
+# — workflow_dispatch → run manually from Actions → "Run workflow".
 name: UNSW-NB15_MLOPS CI
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:

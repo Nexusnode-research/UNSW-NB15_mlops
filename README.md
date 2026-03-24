@@ -5,6 +5,8 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 **Version 1.0** — [See release notes in CHANGELOG.md](./CHANGELOG.md)
 
+**CI / deploy:** Pushes to `main` do **not** start workflows. **CI** runs on **pull requests** to `main` and can be run **manually** (Actions → *UNSW-NB15_MLOPS CI* → *Run workflow*). **Deploy to EKS** is **manual only** (Actions → *Build & Deploy to EKS*).
+
 End-to-end, production-style MLOps pipeline for **network intrusion detection** on the **UNSW-NB15** dataset.
 It covers the full stack: **data engineering → model training (XGBoost) → threshold selection → ONNX export → FastAPI service → Dash UI → CI smoke tests → Kubernetes (HPA, probes, kustomize).**
 

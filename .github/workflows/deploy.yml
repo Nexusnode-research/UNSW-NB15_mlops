@@ -1,8 +1,8 @@
+# Deploy is manual only (Actions → this workflow → "Run workflow").
+# Does not run on git push, to avoid accidental ECR/EKS rollouts.
 name: UNSW-NB15_MLOPS — Build & Deploy to EKS
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch: {}
 
 env:

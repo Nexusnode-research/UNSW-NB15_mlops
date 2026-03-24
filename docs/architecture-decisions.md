@@ -153,6 +153,12 @@ The current single `requirements.txt` may remain as a convenience shim that `pip
 
 ### CI Pipeline Contract
 
+| Trigger | When it runs |
+|---|---|
+| `pull_request` → `main` | Pre-merge CI (tests, bundle, Docker, etc.) |
+| `workflow_dispatch` | Manual run from GitHub Actions (“Run workflow”) |
+| **Not** on `push` | Ordinary pushes do not start CI (cost/noise control) |
+
 | Job | What it actually proves |
 |---|---|
 | `lint` | ruff + black --check |
@@ -162,6 +168,8 @@ The current single `requirements.txt` may remain as a convenience shim that `pip
 | `deploy` | Manifest validation + rollout + post-deploy `/health` |
 
 CI synthetic training jobs must be labelled as smoke fixtures, not presented as real training.
+
+**EKS deploy workflow** (`.github/workflows/deploy.yml`) is **`workflow_dispatch` only** — it does not run on push.
 
 ---
 

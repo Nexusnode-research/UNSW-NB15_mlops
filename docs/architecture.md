@@ -80,7 +80,7 @@ When the notebook completes the sweeping tasks and serialization commands, it ge
 This bundled local state is accessed physically during `docker compose` up-cycle logic via bind mounts OR physically copied into Dockerfile filesystem layers during the `docker build` process for remote CI/CD clusters. The API runs a `validate_bundle.py` startup routine to prevent serving an incomplete filesystem state.
 
 ## 4. Deployment Flow (CI/CD to EKS)
-Changes pushed to the `main` branch trigger continuous integration workflows on GitHub Actions:
+GitHub Actions workflows are **not** tied to ordinary `git push`. **CI** runs on **pull requests** targeting `main` and can be **started manually** from the Actions tab (`workflow_dispatch`). **Build & deploy to EKS** runs **only** when that workflow is started manually (same tab), so registry and cluster updates stay deliberate.
 1. **Testing:** `pytest` suites evaluate artifact health, payload formatting, integration edge-cases, and threshold limits.
 2. **Dockerization:** Immutable AMD64 Docker images are compiled using deterministic Dockerfiles.
 3. **Registry Pipeline:** Images tagged with git-hashes / digests are pushed to an AWS ECR authenticated repository logic pipeline.
