@@ -1,4 +1,4 @@
-﻿# --- Model artifacts (managed via Git LFS or external storage) ---
+# --- Model artifacts (managed via Git LFS or external storage) ---
 notebooks/ids_unsw/models/*.pkl
 notebooks/ids_unsw/models/*.onnx
 notebooks/ids_unsw/models/*.json
@@ -65,3 +65,6 @@ Thumbs.db
 # --- Previously tracked large model files (deleted from git history) ---
 notebooks/ids_unsw/best_randomforest_model.pkl
 notebooks/ids_unsw/best_xgboost_model.pkl
+
+# --- Papers (LaTeX sources and PDFs; keep local only) ---
+Paper/
